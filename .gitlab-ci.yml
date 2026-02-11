@@ -3,9 +3,10 @@ codeguardian-review:
   stage: test
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+  before_script:
+    - pip install uv
   script:
-    - pip install -r requirements.txt
-    - python -m src.review
+    - uv run python -m src.review
   variables:
     GITLAB_TOKEN: $GITLAB_TOKEN
     OPENAI_API_KEY: $OPENAI_API_KEY

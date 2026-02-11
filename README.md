@@ -33,6 +33,7 @@ src/
 
 ### Prerequisites
 
+- [uv](https://docs.astral.sh/uv/) (Python package manager)
 - Python 3.11+
 - OpenAI API Key ([platform.openai.com](https://platform.openai.com))
 
@@ -76,17 +77,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: astral-sh/setup-uv@v5
         with:
-          python-version: '3.11'
-      - run: pip install -r requirements.txt
-      - run: python -m src.review
+          version: "latest"
+      - run: uv run python -m src.review
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 ```
 
-**3. Copy the `src/` directory and `requirements.txt` into your repo.**
+**3. Copy the `src/` directory and `pyproject.toml` into your repo.**
 
 **4. Open a PR — CodeGuardian will automatically review it.**
 
@@ -120,15 +120,16 @@ codeguardian-review:
   stage: test
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+  before_script:
+    - pip install uv
   script:
-    - pip install -r requirements.txt
-    - python -m src.review
+    - uv run python -m src.review
   variables:
     GITLAB_TOKEN: $GITLAB_TOKEN
     OPENAI_API_KEY: $OPENAI_API_KEY
 ```
 
-**4. Copy the `src/` directory and `requirements.txt` into your repo.**
+**4. Copy the `src/` directory and `pyproject.toml` into your repo.**
 
 **5. Open a Merge Request — CodeGuardian will automatically review it.**
 
@@ -137,14 +138,13 @@ codeguardian-review:
 ### Install dependencies
 
 ```bash
-pip install -r requirements.txt
-pip install pytest pytest-mock
+uv sync --group dev
 ```
 
 ### Run tests
 
 ```bash
-python -m pytest tests/ -v
+uv run pytest tests/ -v
 ```
 
 ### Dry run (mock mode)
@@ -155,7 +155,7 @@ GitHub mode:
 GITHUB_EVENT_PATH=tests/fixtures/event.json \
 OPENAI_API_KEY=mock \
 GITHUB_TOKEN=mock \
-python -m src.review
+uv run python -m src.review
 ```
 
 GitLab mode:
@@ -165,7 +165,7 @@ CI_MERGE_REQUEST_IID=42 \
 CI_PROJECT_ID=1 \
 OPENAI_API_KEY=mock \
 GITLAB_TOKEN=mock \
-python -m src.review
+uv run python -m src.review
 ```
 
 > When `OPENAI_API_KEY` is set to `mock`, CodeGuardian returns canned responses without calling the OpenAI API.
@@ -231,12 +231,16 @@ Binary files, markdown, and config files are skipped.
 
 ## Dependencies
 
+Managed via [uv](https://docs.astral.sh/uv/) with `pyproject.toml`.
+
 | Package | Version | Purpose |
 |---------|---------|---------|
-| PyGithub | 2.5.0 | GitHub API client |
-| python-gitlab | 4.13.0 | GitLab API client |
-| openai | 1.58.0 | OpenAI GPT-4o-mini |
-| pydantic | 2.10.0 | Structured output models |
+| PyGithub | >=2.5.0 | GitHub API client |
+| python-gitlab | >=4.13.0 | GitLab API client |
+| openai | >=1.58.0 | OpenAI GPT-4o-mini |
+| pydantic | >=2.10.0 | Structured output models |
+
+Dev dependencies: `pytest`, `pytest-mock`
 
 ## License
 

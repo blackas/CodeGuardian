@@ -1,0 +1,22 @@
+[project]
+name = "codeguardian"
+version = "0.1.0"
+description = "AI code reviewer for GitHub PRs and GitLab MRs — detects bugs, security vulnerabilities, and performance issues with Quant Trading awareness"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+dependencies = [
+    "PyGithub>=2.5.0",
+    "python-gitlab>=4.13.0",
+    "openai>=1.58.0",
+    "pydantic>=2.10.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-mock>=3.14.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
