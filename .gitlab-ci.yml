@@ -1,0 +1,11 @@
+codeguardian-review:
+  image: python:3.11-slim
+  stage: test
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+  script:
+    - pip install -r requirements.txt
+    - python -m src.review
+  variables:
+    GITLAB_TOKEN: $GITLAB_TOKEN
+    OPENAI_API_KEY: $OPENAI_API_KEY
