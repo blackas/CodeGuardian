@@ -24,6 +24,21 @@ def load_event_data(event_path: str) -> dict:
         return json.load(file)
 
 
+def _fetch_project_context(platform: CodeReviewPlatform) -> str:
+    """Fetch AGENTS.md from repo base branch for project context.
+
+    Args:
+        platform: Platform client with get_file_content method.
+
+    Returns:
+        AGENTS.md content, or empty string if not found.
+    """
+    content = platform.get_file_content("AGENTS.md")
+    if content and content.strip():
+        return content
+    return ""
+
+
 def create_platform() -> CodeReviewPlatform:
     """Auto-detect CI platform and create the appropriate client.
 
@@ -136,6 +151,9 @@ def main() -> None:
     platform = create_platform()
     context = platform.get_context()
 
+    # Fetch project context from AGENTS.md on base branch
+    project_context = _fetch_project_context(platform)
+
     # Fork check: skip review to avoid leaking secrets
     if platform.is_fork():
         print("WARNING: PR is from a fork. Skipping review to protect secrets.")
@@ -160,7 +178,7 @@ def main() -> None:
 
     # Initialize AI reviewer
     api_key = os.environ.get("OPENAI_API_KEY", "")
-    reviewer = AIReviewer(api_key=api_key)
+    reviewer = AIReviewer(api_key=api_key, project_context=project_context)
 
     try:
         # Prepare files for review

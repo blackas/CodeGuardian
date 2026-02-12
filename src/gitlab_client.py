@@ -3,7 +3,7 @@
 import logging
 
 import gitlab
-from gitlab.exceptions import GitlabCreateError
+from gitlab.exceptions import GitlabCreateError, GitlabGetError
 
 from src.platform_protocol import PlatformContext, PlatformFile
 
@@ -139,3 +139,25 @@ class GitLabClient:
         self._merge_request.notes.create(
             {"body": f"⚠️ CodeGuardian Error: {error_message}"}
         )
+
+    def get_file_content(self, file_path: str) -> str | None:
+        """Get the content of a file from the base branch.
+
+        Args:
+            file_path: Path to the file relative to repo root.
+
+        Returns:
+            File content as string, or None if file not found.
+        """
+        try:
+            file_obj = self._project.files.get(
+                file_path=file_path, ref=self._merge_request.target_branch
+            )
+            return file_obj.decode().decode("utf-8")
+        except GitlabGetError:
+            logger.warning(
+                "File not found: %s on branch %s",
+                file_path,
+                self._merge_request.target_branch,
+            )
+            return None

@@ -6,6 +6,7 @@ import logging
 from typing import Any
 
 from github import Github, GithubException
+from github.GithubException import UnknownObjectException
 
 from src.platform_protocol import PlatformContext, PlatformFile
 
@@ -129,6 +130,23 @@ class GitHubClient:
             error_message: Error message text.
         """
         self._pr.create_issue_comment(body=error_message)
+
+    def get_file_content(self, file_path: str) -> str | None:
+        """Get the content of a file from the base branch.
+
+        Args:
+            file_path: Path to the file relative to repo root.
+
+        Returns:
+            File content as string, or None if file not found.
+        """
+        try:
+            base_ref = self._event_data["pull_request"]["base"]["ref"]
+            content_file = self._repo.get_contents(file_path, ref=base_ref)
+            return content_file.decoded_content.decode("utf-8")
+        except UnknownObjectException:
+            logger.warning("File not found: %s on branch %s", file_path, base_ref)
+            return None
 
     def _chunk_comments(
         self,

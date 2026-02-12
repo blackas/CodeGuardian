@@ -94,3 +94,14 @@ class CodeReviewPlatform(Protocol):
             error_message: Error message text.
         """
         ...
+
+    def get_file_content(self, file_path: str) -> str | None:
+        """Get the content of a file from the base branch.
+
+        Args:
+            file_path: Path to the file relative to repo root.
+
+        Returns:
+            File content as string, or None if file not found.
+        """
+        ...

@@ -39,16 +39,18 @@ class AIReviewer:
     """Code reviewer powered by OpenAI GPT-4o-mini with structured output.
 
     Uses structured JSON output to ensure consistent, parseable review comments.
-    Includes domain-specific awareness for quantitative trading patterns.
+    Supports dynamic project context to tailor reviews to specific codebases.
     """
 
-    def __init__(self, api_key: str) -> None:
+    def __init__(self, api_key: str, project_context: str = "") -> None:
         """Initialize the AI reviewer.
 
         Args:
             api_key: OpenAI API key. Use "mock" for mock mode.
+            project_context: Optional project context (e.g., AGENTS.md content) to inform reviews.
         """
         self._api_key = api_key
+        self._project_context = project_context
         self._is_mock = api_key == "mock" or not api_key
         if not self._is_mock:
             self._client: OpenAI = OpenAI(api_key=api_key)
@@ -117,31 +119,30 @@ class AIReviewer:
         return all_comments
 
     def _build_system_prompt(self) -> str:
-        """Build the system prompt with quant-trading-aware review guidelines.
+        """Build the system prompt, optionally with project context.
 
         Returns:
-            System prompt string with domain-specific patterns.
+            System prompt string, either context-aware or generic.
         """
-        return (
-            "You are a senior code reviewer specializing in quantitative trading systems. "
-            "Review the provided code diff and return structured JSON feedback.\n\n"
-            "Pay special attention to these critical patterns in quant/trading code:\n\n"
-            "1. FLOAT COMPARISON: Never use `float == float` for equality checks. "
-            "Use `math.isclose()` or `Decimal` for precise comparisons.\n\n"
-            "2. FLOAT FOR MONEY: Never use `float` for monetary/price calculations. "
-            "Use `Decimal` from the `decimal` module to avoid floating-point errors.\n\n"
-            "3. TIMEZONE-NAIVE DATETIME: Never use timezone-naive `datetime`. "
-            "Always use `datetime.timezone.utc` or explicit timezone info.\n\n"
-            "4. O(N^2) LOOPS: Flag O(n^2) or worse loops in order matching, "
-            "signal processing, or other hot paths. Suggest efficient alternatives.\n\n"
-            "5. RACE CONDITIONS: Watch for race conditions in async order execution, "
-            "shared mutable state, or concurrent market data access.\n\n"
-            "6. MISSING ERROR HANDLING: Flag missing error handling around exchange "
-            "API calls, network requests, and external service interactions.\n\n"
-            "For each issue found, provide the file path, line number, severity "
-            "(error/warning/info), category (bug/security/performance/readability), "
-            "and a clear explanation of the issue and suggested fix."
-        )
+        if self._project_context:
+            return (
+                "You are a senior code reviewer. The following describes the project you are reviewing:\n\n"
+                f"{self._project_context}\n\n"
+                "Based on this project context, review the provided code diff and return structured JSON feedback. "
+                "For each issue found, provide the file path, line number, severity (error/warning/info), "
+                "category (bug/security/performance/readability), and a clear explanation of the issue and suggested fix."
+            )
+        else:
+            return (
+                "You are a senior code reviewer. Review the provided code diff and return structured JSON feedback.\n\n"
+                "Focus on:\n"
+                "1. Logic errors and potential bugs\n"
+                "2. Security vulnerabilities\n"
+                "3. Performance issues\n"
+                "4. Code readability and maintainability\n\n"
+                "For each issue found, provide the file path, line number, severity (error/warning/info), "
+                "category (bug/security/performance/readability), and a clear explanation of the issue and suggested fix."
+            )
 
     def _build_user_prompt(
         self,
