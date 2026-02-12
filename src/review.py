@@ -213,3 +213,7 @@ def main() -> None:
 
     except Exception as error:
         platform.post_error_comment(f"CodeGuardian encountered an error: {error}")
+
+
+if __name__ == "__main__":
+    main()
