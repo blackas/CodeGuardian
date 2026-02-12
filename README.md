@@ -1,21 +1,47 @@
 # CodeGuardian
 
-AI code reviewer that automatically reviews Pull Requests (GitHub) and Merge Requests (GitLab). Uses OpenAI GPT-4o-mini to detect bugs, security vulnerabilities, and performance issues — with special awareness for **Quant Trading** patterns.
+AI code reviewer that automatically reviews Pull Requests (GitHub) and Merge Requests (GitLab). Uses OpenAI GPT-4o-mini to detect bugs, security vulnerabilities, and performance issues — with context-aware review tailored to your project.
 
 ## Features
 
 - **Dual Platform** — Works on both GitHub Actions and GitLab CI/CD
 - **Auto-Detection** — Automatically detects which CI environment is running
 - **Inline Comments** — Posts review comments directly on specific lines of code
-- **Quant Trading Focus** — Extra-critical about:
-  - `float == float` comparisons (suggests `math.isclose()` or `Decimal`)
-  - `float` for monetary/price calculations (suggests `Decimal`)
-  - Timezone-naive `datetime` in trading logic
-  - O(n²) loops in order matching / signal processing
-  - Race conditions in async order execution
-  - Missing error handling around exchange API calls
+- **Context-Aware Review** — Reads `AGENTS.md` from your repository to understand project structure, architecture, and domain-specific concerns. Tailors review focus to your project's needs.
 - **Fork-Safe** — Detects fork PRs and exits early to avoid leaking secrets
 - **Hallucination Guard** — Validates AI-suggested line numbers against the actual diff
+
+## Project Context (AGENTS.md)
+
+CodeGuardian reads `AGENTS.md` from the base branch (e.g., `main`) of your repository to understand your project's structure, architecture, and domain-specific concerns. This context is used to build a project-specific review prompt that tailors CodeGuardian's focus to your needs.
+
+**How it works:**
+1. When a PR/MR is opened, CodeGuardian fetches `AGENTS.md` from the base branch
+2. The content is parsed and included in the review prompt sent to GPT-4o-mini
+3. The AI reviewer uses this context to identify issues relevant to your project
+4. If no `AGENTS.md` exists, CodeGuardian falls back to a generic senior developer review
+
+**Example AGENTS.md:**
+
+```markdown
+# Project Context
+
+## Architecture
+- Microservices with async/await patterns
+- PostgreSQL with connection pooling
+- Redis for caching
+
+## Key Concerns
+- Race conditions in concurrent operations
+- N+1 query problems
+- Memory leaks in long-running processes
+- Timezone handling in timestamps
+
+## Code Standards
+- Type hints required (mypy strict mode)
+- 100% test coverage for critical paths
+- No hardcoded credentials
+```
 
 ## Architecture
 
@@ -183,13 +209,16 @@ Fork PR? ──yes──▶ Exit (no API calls)
     │
     no
     ▼
+Read AGENTS.md from base branch
+    │
+    ▼
 Fetch changed files
     │
     ▼
 Filter: .py, .js, .ts, .html only
     │
     ▼
-Send diffs to GPT-4o-mini
+Send diffs + context to GPT-4o-mini
     │
     ▼
 Validate line numbers against diff

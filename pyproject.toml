@@ -1,7 +1,7 @@
 [project]
 name = "codeguardian"
 version = "0.1.0"
-description = "AI code reviewer for GitHub PRs and GitLab MRs — detects bugs, security vulnerabilities, and performance issues with Quant Trading awareness"
+description = "AI code reviewer for GitHub PRs and GitLab MRs — detects bugs, security vulnerabilities, and performance issues with project-aware context from AGENTS.md"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"
