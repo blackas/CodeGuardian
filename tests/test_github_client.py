@@ -5,6 +5,7 @@ import logging
 
 import pytest
 from github import GithubException
+from github.GithubException import UnknownObjectException
 
 from src.github_client import GitHubClient
 from src.platform_protocol import (
@@ -32,6 +33,7 @@ def _make_event_data(
                 "repo": {"full_name": head_repo},
             },
             "base": {
+                "ref": "main",
                 "repo": {"full_name": base_repo},
             },
         },
@@ -253,3 +255,47 @@ class TestPostErrorComment:
         mock_pr.create_issue_comment.assert_called_once_with(
             body="Something went wrong"
         )
+
+
+class TestGetFileContentSuccess:
+    """get_file_content returns decoded content when file exists."""
+
+    def test_returns_decoded_content(self, mock_github):
+        client, _, mock_repo = mock_github
+
+        mock_content_file = MagicMock()
+        mock_content_file.decoded_content = b"# My Project"
+        mock_repo.get_contents.return_value = mock_content_file
+
+        result = client.get_file_content("AGENTS.md")
+
+        assert result == "# My Project"
+        mock_repo.get_contents.assert_called_once_with("AGENTS.md", ref="main")
+
+
+class TestGetFileContentNotFound:
+    """get_file_content returns None on 404."""
+
+    def test_returns_none_on_404(self, mock_github):
+        client, _, mock_repo = mock_github
+
+        mock_repo.get_contents.side_effect = UnknownObjectException(
+            404, {"message": "Not Found"}, {}
+        )
+
+        result = client.get_file_content("AGENTS.md")
+
+        assert result is None
+
+
+class TestGetFileContentError:
+    """get_file_content returns None on generic exception."""
+
+    def test_returns_none_on_generic_error(self, mock_github):
+        client, _, mock_repo = mock_github
+
+        mock_repo.get_contents.side_effect = Exception("Connection error")
+
+        result = client.get_file_content("AGENTS.md")
+
+        assert result is None

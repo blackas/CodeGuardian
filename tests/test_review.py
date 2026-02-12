@@ -125,6 +125,7 @@ class TestMainEndToEndGithub:
         mock_create_platform.return_value = mock_platform
 
         mock_platform.is_fork.return_value = False
+        mock_platform.get_file_content.return_value = None
         mock_platform.get_context.return_value = MagicMock(
             title="Add feature",
             description="Adds X",
@@ -173,6 +174,7 @@ class TestMainEndToEndGitlab:
         mock_create_platform.return_value = mock_platform
 
         mock_platform.is_fork.return_value = False
+        mock_platform.get_file_content.return_value = None
         mock_platform.get_context.return_value = MagicMock(
             title="Fix bug",
             description="Fixes Y",
@@ -215,6 +217,7 @@ class TestForkPrExitsEarly:
         mock_platform = MagicMock()
         mock_create_platform.return_value = mock_platform
         mock_platform.is_fork.return_value = True
+        mock_platform.get_file_content.return_value = None
         mock_platform.get_context.return_value = MagicMock(
             title="Fork PR",
             description="From fork",
@@ -240,6 +243,7 @@ class TestNoReviewableFilesPostsSummary:
         mock_platform = MagicMock()
         mock_create_platform.return_value = mock_platform
         mock_platform.is_fork.return_value = False
+        mock_platform.get_file_content.return_value = None
         mock_platform.get_context.return_value = MagicMock(
             title="Update README",
             description="Docs only",
@@ -275,6 +279,7 @@ class TestInvalidLineCommentsFiltered:
         mock_platform = MagicMock()
         mock_create_platform.return_value = mock_platform
         mock_platform.is_fork.return_value = False
+        mock_platform.get_file_content.return_value = None
         mock_platform.get_context.return_value = MagicMock(
             title="Test",
             description="Test",
@@ -328,6 +333,7 @@ class TestErrorPostsErrorComment:
         mock_platform = MagicMock()
         mock_create_platform.return_value = mock_platform
         mock_platform.is_fork.return_value = False
+        mock_platform.get_file_content.return_value = None
         mock_platform.get_context.return_value = MagicMock(
             title="Test",
             description="Test",
@@ -448,3 +454,85 @@ class TestBuildSummary:
         """Empty comments list produces summary with 0 issues."""
         result = build_summary([])
         assert "0 issues" in result
+
+
+class TestProjectContextPassedToReviewer:
+    """AGENTS.md content is passed to AIReviewer as project_context."""
+
+    @patch("src.review.AIReviewer")
+    @patch("src.review.create_platform")
+    def test_agents_md_passed_to_reviewer(
+        self, mock_create_platform, mock_reviewer_cls
+    ):
+        mock_platform = MagicMock()
+        mock_create_platform.return_value = mock_platform
+
+        mock_platform.is_fork.return_value = False
+        mock_platform.get_file_content.return_value = (
+            "# E-commerce App\nDjango-based..."
+        )
+        mock_platform.get_context.return_value = MagicMock(
+            title="Add feature",
+            description="Adds X",
+            head_sha="abc123",
+        )
+
+        mock_file = MagicMock()
+        mock_file.filename = "src/app.py"
+        mock_file.patch = SAMPLE_PATCH
+        mock_file.additions = 2
+        mock_file.deletions = 0
+        mock_platform.get_files.return_value = [mock_file]
+
+        mock_reviewer = MagicMock()
+        mock_reviewer_cls.return_value = mock_reviewer
+        mock_reviewer.review_files.return_value = []
+
+        env = {"OPENAI_API_KEY": "sk-test"}
+        with patch.dict(os.environ, env, clear=False):
+            main()
+
+        mock_reviewer_cls.assert_called_once_with(
+            api_key="sk-test",
+            project_context="# E-commerce App\nDjango-based...",
+        )
+
+
+class TestNoAgentsMdFallsBackToGeneric:
+    """When AGENTS.md is not found, project_context is empty string."""
+
+    @patch("src.review.AIReviewer")
+    @patch("src.review.create_platform")
+    def test_no_agents_md_gives_empty_context(
+        self, mock_create_platform, mock_reviewer_cls
+    ):
+        mock_platform = MagicMock()
+        mock_create_platform.return_value = mock_platform
+
+        mock_platform.is_fork.return_value = False
+        mock_platform.get_file_content.return_value = None
+        mock_platform.get_context.return_value = MagicMock(
+            title="Add feature",
+            description="Adds X",
+            head_sha="abc123",
+        )
+
+        mock_file = MagicMock()
+        mock_file.filename = "src/app.py"
+        mock_file.patch = SAMPLE_PATCH
+        mock_file.additions = 2
+        mock_file.deletions = 0
+        mock_platform.get_files.return_value = [mock_file]
+
+        mock_reviewer = MagicMock()
+        mock_reviewer_cls.return_value = mock_reviewer
+        mock_reviewer.review_files.return_value = []
+
+        env = {"OPENAI_API_KEY": "sk-test"}
+        with patch.dict(os.environ, env, clear=False):
+            main()
+
+        mock_reviewer_cls.assert_called_once_with(
+            api_key="sk-test",
+            project_context="",
+        )

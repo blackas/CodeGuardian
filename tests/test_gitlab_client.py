@@ -3,6 +3,8 @@
 import pytest
 from unittest.mock import MagicMock, patch
 
+from gitlab.exceptions import GitlabGetError
+
 from src.gitlab_client import GitLabClient
 from src.platform_protocol import PlatformContext, PlatformFile, CodeReviewPlatform
 
@@ -15,6 +17,7 @@ def mock_mr():
     mr.title = "Fix authentication bug"
     mr.description = "Resolves issue #99 with token refresh"
     mr.sha = "head_sha_abc123"
+    mr.target_branch = "main"
     mr.diff_refs = {
         "base_sha": "base_sha_000",
         "start_sha": "start_sha_111",
@@ -230,3 +233,41 @@ class TestGitLabUrl:
             mock_gl_cls.assert_called_once_with(
                 "https://gitlab.mycompany.com", private_token="test-token"
             )
+
+
+class TestGetFileContentSuccess:
+    """get_file_content returns decoded content when file exists."""
+
+    def test_returns_decoded_content(self, client, mock_project):
+        mock_file_obj = MagicMock()
+        mock_file_obj.decode.return_value = b"# My Project"
+        mock_project.files.get.return_value = mock_file_obj
+
+        result = client.get_file_content("AGENTS.md")
+
+        assert result == "# My Project"
+        mock_project.files.get.assert_called_once_with(
+            file_path="AGENTS.md", ref="main"
+        )
+
+
+class TestGetFileContentNotFound:
+    """get_file_content returns None when file doesn't exist."""
+
+    def test_returns_none_on_not_found(self, client, mock_project):
+        mock_project.files.get.side_effect = GitlabGetError("404 File Not Found")
+
+        result = client.get_file_content("AGENTS.md")
+
+        assert result is None
+
+
+class TestGetFileContentError:
+    """get_file_content returns None on generic exception."""
+
+    def test_returns_none_on_generic_error(self, client, mock_project):
+        mock_project.files.get.side_effect = Exception("Connection error")
+
+        result = client.get_file_content("AGENTS.md")
+
+        assert result is None

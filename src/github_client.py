@@ -147,6 +147,9 @@ class GitHubClient:
         except UnknownObjectException:
             logger.warning("File not found: %s on branch %s", file_path, base_ref)
             return None
+        except Exception:
+            logger.warning("Error reading file: %s", file_path)
+            return None
 
     def _chunk_comments(
         self,

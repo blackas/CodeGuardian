@@ -85,6 +85,9 @@ class TestProtocolStructuralSubtyping:
             def post_error_comment(self, error_message: str) -> None:
                 pass
 
+            def get_file_content(self, file_path: str) -> str | None:
+                return None
+
         dummy = DummyPlatform()
         assert isinstance(dummy, CodeReviewPlatform)
 
@@ -104,7 +107,7 @@ class TestProtocolStructuralSubtyping:
             def get_files(self) -> list[PlatformFile]:
                 return []
 
-            # Missing: is_fork, post_review_comments, post_error_comment
+            # Missing: is_fork, post_review_comments, post_error_comment, get_file_content
 
         incomplete = IncompletePlatform()
         assert not isinstance(incomplete, CodeReviewPlatform)

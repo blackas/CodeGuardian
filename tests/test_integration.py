@@ -8,6 +8,8 @@ import tempfile
 from unittest.mock import MagicMock, patch
 
 import pytest
+import github
+import gitlab.exceptions
 
 from src.review import main
 
@@ -29,6 +31,7 @@ class TestGithubEndToEnd:
         mock_pr = MagicMock()
         mock_github_cls.return_value.get_repo.return_value = mock_repo
         mock_repo.get_pull.return_value = mock_pr
+        mock_repo.get_contents.side_effect = github.UnknownObjectException(404, {}, {})
 
         mock_file = MagicMock()
         mock_file.filename = "src/main.py"
@@ -96,6 +99,9 @@ class TestGitlabEndToEnd:
 
         mock_project = MagicMock()
         mock_gl.projects.get.return_value = mock_project
+        mock_project.files.get.side_effect = gitlab.exceptions.GitlabGetError(
+            "404 File Not Found"
+        )
 
         mock_mr = MagicMock()
         mock_project.mergerequests.get.return_value = mock_mr
@@ -103,6 +109,7 @@ class TestGitlabEndToEnd:
         mock_mr.title = "Fix auth bug"
         mock_mr.description = "Token refresh fix"
         mock_mr.sha = "head_sha_abc"
+        mock_mr.target_branch = "main"
         mock_mr.diff_refs = {
             "base_sha": "base000",
             "start_sha": "start111",
@@ -178,6 +185,7 @@ class TestGithubErrorPostsComment:
         mock_pr = MagicMock()
         mock_github_cls.return_value.get_repo.return_value = mock_repo
         mock_repo.get_pull.return_value = mock_pr
+        mock_repo.get_contents.side_effect = github.UnknownObjectException(404, {}, {})
 
         mock_file = MagicMock()
         mock_file.filename = "src/main.py"
@@ -219,6 +227,9 @@ class TestGitlabErrorPostsComment:
 
         mock_project = MagicMock()
         mock_gl.projects.get.return_value = mock_project
+        mock_project.files.get.side_effect = gitlab.exceptions.GitlabGetError(
+            "404 File Not Found"
+        )
 
         mock_mr = MagicMock()
         mock_project.mergerequests.get.return_value = mock_mr
@@ -226,6 +237,7 @@ class TestGitlabErrorPostsComment:
         mock_mr.title = "Fix bug"
         mock_mr.description = "Desc"
         mock_mr.sha = "sha123"
+        mock_mr.target_branch = "main"
         mock_mr.diff_refs = {
             "base_sha": "b",
             "start_sha": "s",

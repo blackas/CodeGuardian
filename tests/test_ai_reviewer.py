@@ -76,20 +76,42 @@ class TestReviewDiffReturnsStructuredResponse:
         assert result.summary == "Found 1 issue."
 
 
-class TestSystemPromptContainsQuantPatterns:
-    """Test that system prompt includes all quant trading patterns."""
+class TestSystemPromptGenericWhenNoContext:
+    """System prompt is generic when no project context is provided."""
 
-    def test_system_prompt_contains_quant_patterns(self) -> None:
-        """System prompt references all 6 critical quant patterns."""
+    def test_generic_prompt_contains_review_keywords(self) -> None:
+        reviewer = AIReviewer(api_key="test-key", project_context="")
+        prompt = reviewer._build_system_prompt()
+
+        assert "senior" in prompt.lower()
+        assert "security" in prompt.lower() or "Security" in prompt
+        assert "bug" in prompt.lower()
+        assert "quant" not in prompt.lower()
+        assert "trading" not in prompt.lower()
+
+
+class TestSystemPromptContainsProjectContext:
+    """System prompt includes project context when provided."""
+
+    def test_prompt_includes_project_context(self) -> None:
+        reviewer = AIReviewer(
+            api_key="test-key",
+            project_context="Django REST API for payments",
+        )
+        prompt = reviewer._build_system_prompt()
+
+        assert "Django REST API for payments" in prompt
+
+
+class TestBackwardCompatibleConstructor:
+    """AIReviewer constructor works without project_context."""
+
+    def test_no_type_error_without_project_context(self) -> None:
         reviewer = AIReviewer(api_key="test-key")
         prompt = reviewer._build_system_prompt()
 
-        assert "float" in prompt.lower() and "isclose" in prompt.lower()
-        assert "Decimal" in prompt
-        assert "timezone" in prompt.lower()
-        assert "O(n" in prompt
-        assert "race condition" in prompt.lower() or "Race" in prompt
-        assert "error handling" in prompt.lower()
+        assert "senior" in prompt.lower()
+        assert "quant" not in prompt.lower()
 
 
 class TestSanitizeInputStripsMarkdown:

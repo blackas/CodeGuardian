@@ -161,3 +161,6 @@ class GitLabClient:
                 self._merge_request.target_branch,
             )
             return None
+        except Exception:
+            logger.warning("Error reading file: %s", file_path)
+            return None
