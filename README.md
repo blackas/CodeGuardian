@@ -116,6 +116,47 @@ jobs:
 
 **4. Open a PR — CodeGuardian will automatically review it.**
 
+### 다른 Repository에서 사용하기 (Reusable Workflow)
+
+여러 개의 Repository에서 CodeGuardian을 사용하려면, **Reusable Workflow**를 사용하는 것이 가장 간단합니다. 이 방식은 CodeGuardian 소스 코드를 복사할 필요 없이, 중앙 Repository의 workflow를 재사용합니다.
+
+**장점:**
+- 소스 코드 복사 불필요
+- 중앙 Repository에서 한 번만 업데이트하면 모든 Repository에 적용
+- 각 Repository는 최소한의 설정만 필요
+
+**1. 대상 Repository에 OpenAI API Key를 Secret으로 등록:**
+
+Settings → Secrets and variables → Actions → New repository secret
+
+| Name | Value |
+|------|-------|
+| `OPENAI_API_KEY` | `sk-...` |
+
+**2. 대상 Repository에 `.github/workflows/codeguardian.yml` 파일 생성:**
+
+```yaml
+name: CodeGuardian Review
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  review:
+    uses: blackas/CodeGuardian/.github/workflows/reusable-review.yml@main
+    permissions:
+      contents: read
+      pull-requests: write
+    secrets:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+```
+
+**3. (선택) 대상 Repository에 `AGENTS.md` 파일 추가:**
+
+프로젝트의 아키텍처, 주요 관심사, 코드 표준을 정의하는 `AGENTS.md` 파일을 Repository 루트에 추가하면, CodeGuardian이 프로젝트에 맞춘 더 정확한 리뷰를 수행합니다. (자세한 내용은 [Project Context (AGENTS.md)](#project-context-agentsmd) 섹션 참고)
+
+**4. PR을 열면 CodeGuardian이 자동으로 리뷰합니다.**
+
 ### GitLab CI/CD
 
 **1. Create a Project Access Token:**
