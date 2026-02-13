@@ -10,6 +10,7 @@ import pytest
 
 from src.ai_reviewer import ReviewComment
 from src.review import (
+    _build_event_data_from_pr,
     build_summary,
     create_platform,
     format_comment_body,
@@ -95,7 +96,7 @@ class TestCreatePlatformGitlab:
 
         mock_gitlab_cls.assert_called_once_with(
             token="glpat-test",
-            project_id="12345",
+            project_id=12345,
             mr_iid=7,
             gitlab_url="https://gitlab.example.com",
         )
@@ -536,3 +537,116 @@ class TestNoAgentsMdFallsBackToGeneric:
             api_key="sk-test",
             project_context="",
         )
+
+
+class TestBuildEventDataFromPr:
+    """Test synthetic event data construction from PR number."""
+
+    @patch("github.Github")
+    def test_builds_correct_event_data(self, mock_github_cls):
+        """Synthetic event_data has all required keys."""
+        mock_pr = MagicMock()
+        mock_pr.number = 42
+        mock_pr.title = "Test PR"
+        mock_pr.body = "Description"
+        mock_pr.head.sha = "abc123"
+        mock_pr.head.repo.full_name = "owner/repo"
+        mock_pr.base.ref = "main"
+        mock_pr.base.repo.full_name = "owner/repo"
+
+        mock_repo = MagicMock()
+        mock_repo.get_pull.return_value = mock_pr
+        mock_github_cls.return_value.get_repo.return_value = mock_repo
+
+        result = _build_event_data_from_pr("token", "owner/repo", 42)
+
+        assert result["repository"]["full_name"] == "owner/repo"
+        assert result["pull_request"]["number"] == 42
+        assert result["pull_request"]["title"] == "Test PR"
+        assert result["pull_request"]["body"] == "Description"
+        assert result["pull_request"]["head"]["sha"] == "abc123"
+        assert result["pull_request"]["head"]["repo"]["full_name"] == "owner/repo"
+        assert result["pull_request"]["base"]["ref"] == "main"
+        assert result["pull_request"]["base"]["repo"]["full_name"] == "owner/repo"
+
+
+class TestCreatePlatformManualPrNumber:
+    """Test manual trigger via PR_NUMBER env var."""
+
+    @patch("src.review.GitHubClient")
+    @patch("src.review._build_event_data_from_pr")
+    def test_pr_number_creates_github_client(self, mock_build, mock_client_cls):
+        """PR_NUMBER + REPO_NAME triggers manual mode."""
+        mock_build.return_value = _make_github_event_data()
+        env = {
+            "PR_NUMBER": "42",
+            "REPO_NAME": "owner/repo",
+            "GITHUB_TOKEN": "fake-token",
+        }
+        with patch.dict(os.environ, env, clear=True):
+            result = create_platform()
+
+        mock_build.assert_called_once_with("fake-token", "owner/repo", 42)
+        mock_client_cls.assert_called_once()
+        assert result == mock_client_cls.return_value
+
+    @patch("src.review.GitHubClient")
+    @patch("src.review._build_event_data_from_pr")
+    def test_pr_number_uses_github_repository_fallback(
+        self, mock_build, mock_client_cls
+    ):
+        """GITHUB_REPOSITORY is used when REPO_NAME is not set."""
+        mock_build.return_value = _make_github_event_data()
+        env = {
+            "PR_NUMBER": "42",
+            "GITHUB_REPOSITORY": "owner/repo",
+            "GITHUB_TOKEN": "fake-token",
+        }
+        with patch.dict(os.environ, env, clear=True):
+            result = create_platform()
+
+        mock_build.assert_called_once_with("fake-token", "owner/repo", 42)
+
+    def test_pr_number_without_repo_name_exits(self):
+        """PR_NUMBER without REPO_NAME or GITHUB_REPOSITORY exits with error."""
+        env = {
+            "PR_NUMBER": "42",
+            "GITHUB_TOKEN": "fake-token",
+        }
+        with patch.dict(os.environ, env, clear=True):
+            with pytest.raises(SystemExit) as exc_info:
+                create_platform()
+            assert exc_info.value.code == 1
+
+    def test_pr_number_zero_falls_through(self):
+        """PR_NUMBER=0 should not trigger manual mode."""
+        env: dict[str, str] = {"PR_NUMBER": "0"}
+        with patch.dict(os.environ, env, clear=True):
+            with pytest.raises(SystemExit):
+                create_platform()
+
+    def test_pr_number_empty_falls_through(self):
+        """Empty PR_NUMBER should not trigger manual mode."""
+        env: dict[str, str] = {"PR_NUMBER": ""}
+        with patch.dict(os.environ, env, clear=True):
+            with pytest.raises(SystemExit):
+                create_platform()
+
+    @patch("src.review.GitHubClient")
+    @patch("src.review._build_event_data_from_pr")
+    def test_pr_number_takes_priority_over_event_path(
+        self, mock_build, mock_client_cls
+    ):
+        """PR_NUMBER takes priority even when GITHUB_EVENT_PATH is set."""
+        mock_build.return_value = _make_github_event_data()
+        env = {
+            "PR_NUMBER": "42",
+            "REPO_NAME": "owner/repo",
+            "GITHUB_TOKEN": "fake-token",
+            "GITHUB_EVENT_PATH": "/some/event.json",  # Also set, but should be ignored
+        }
+        with patch.dict(os.environ, env, clear=True):
+            result = create_platform()
+
+        # PR_NUMBER path should be taken, not GITHUB_EVENT_PATH
+        mock_build.assert_called_once_with("fake-token", "owner/repo", 42)

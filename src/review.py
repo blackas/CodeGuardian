@@ -39,11 +39,60 @@ def _fetch_project_context(platform: CodeReviewPlatform) -> str:
     return ""
 
 
+def _build_event_data_from_pr(
+    token: str, repo_name: str, pr_number: int
+) -> dict[str, object]:
+    """Build synthetic event data by fetching PR info from GitHub API.
+
+    Used for manual triggers (workflow_dispatch, issue_comment) where
+    GITHUB_EVENT_PATH doesn't contain pull_request data.
+
+    Args:
+        token: GitHub API token.
+        repo_name: Repository full name (owner/repo).
+        pr_number: Pull request number.
+
+    Returns:
+        Synthetic event data dict compatible with GitHubClient.
+    """
+    from github import Github
+
+    g = Github(token)
+    repo = g.get_repo(repo_name)
+    pr = repo.get_pull(pr_number)
+    return {
+        "repository": {"full_name": repo_name},
+        "pull_request": {
+            "number": pr.number,
+            "title": pr.title,
+            "body": pr.body or "",
+            "head": {
+                "sha": pr.head.sha,
+                "repo": {
+                    "full_name": (pr.head.repo.full_name if pr.head.repo else repo_name)
+                },
+            },
+            "base": {
+                "ref": pr.base.ref,
+                "repo": {
+                    "full_name": (pr.base.repo.full_name if pr.base.repo else repo_name)
+                },
+            },
+        },
+    }
+
+
 def create_platform() -> CodeReviewPlatform:
     """Auto-detect CI platform and create the appropriate client.
 
     Checks environment variables to determine if running on GitHub Actions
     or GitLab CI, then creates and returns the corresponding client.
+    Supports manual triggers via PR_NUMBER env var.
+
+    Priority order:
+    1. PR_NUMBER env var (manual trigger via workflow_dispatch or /review comment)
+    2. GITHUB_EVENT_PATH (automatic GitHub Actions trigger)
+    3. CI_MERGE_REQUEST_IID (automatic GitLab CI trigger)
 
     Returns:
         Platform client implementing CodeReviewPlatform protocol.
@@ -51,6 +100,24 @@ def create_platform() -> CodeReviewPlatform:
     Raises:
         SystemExit: If no supported platform is detected.
     """
+    # Manual trigger: PR_NUMBER takes priority over event data
+    pr_number_str = os.environ.get("PR_NUMBER", "").strip()
+    if pr_number_str and pr_number_str != "0":
+        token = os.environ["GITHUB_TOKEN"]
+        repo_name = os.environ.get("REPO_NAME") or os.environ.get(
+            "GITHUB_REPOSITORY", ""
+        )
+        if not repo_name:
+            print("ERROR: REPO_NAME or GITHUB_REPOSITORY must be set with PR_NUMBER.")
+            sys.exit(1)
+        try:
+            event_data = _build_event_data_from_pr(token, repo_name, int(pr_number_str))
+        except Exception as e:
+            print(f"ERROR: Failed to fetch PR #{pr_number_str} from {repo_name}: {e}")
+            sys.exit(1)
+        return GitHubClient(token=token, repo_name=repo_name, event_data=event_data)
+
+    # Auto-detect from CI environment
     if os.environ.get("GITHUB_EVENT_PATH"):
         event_data = load_event_data(os.environ["GITHUB_EVENT_PATH"])
         return GitHubClient(
@@ -61,7 +128,7 @@ def create_platform() -> CodeReviewPlatform:
     elif os.environ.get("CI_MERGE_REQUEST_IID"):
         return GitLabClient(
             token=os.environ["GITLAB_TOKEN"],
-            project_id=os.environ["CI_PROJECT_ID"],
+            project_id=int(os.environ["CI_PROJECT_ID"]),
             mr_iid=int(os.environ["CI_MERGE_REQUEST_IID"]),
             gitlab_url=os.environ.get("CI_SERVER_URL", "https://gitlab.com"),
         )

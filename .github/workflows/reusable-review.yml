@@ -2,6 +2,17 @@ name: CodeGuardian Reusable Review
 
 on:
   workflow_call:
+    inputs:
+      pr_number:
+        description: "PR number to review (for manual/comment triggers)"
+        required: false
+        type: string
+        default: ""
+      repo_name:
+        description: "Repository full name (owner/repo)"
+        required: false
+        type: string
+        default: ""
     secrets:
       OPENAI_API_KEY:
         description: "OpenAI API key for GPT-4o-mini"
@@ -32,3 +43,5 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+          REPO_NAME: ${{ inputs.repo_name }}
