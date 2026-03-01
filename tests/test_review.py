@@ -142,6 +142,7 @@ class TestMainEndToEndGithub:
 
         mock_reviewer = MagicMock()
         mock_reviewer_cls.return_value = mock_reviewer
+        mock_reviewer.rate_limit_failure_count = 0
         mock_reviewer.review_files.return_value = [
             ReviewComment(
                 file_path="src/app.py",
@@ -191,6 +192,7 @@ class TestMainEndToEndGitlab:
 
         mock_reviewer = MagicMock()
         mock_reviewer_cls.return_value = mock_reviewer
+        mock_reviewer.rate_limit_failure_count = 0
         mock_reviewer.review_files.return_value = [
             ReviewComment(
                 file_path="lib/utils.ts",
@@ -296,6 +298,7 @@ class TestInvalidLineCommentsFiltered:
 
         mock_reviewer = MagicMock()
         mock_reviewer_cls.return_value = mock_reviewer
+        mock_reviewer.rate_limit_failure_count = 0
         mock_reviewer.review_files.return_value = [
             ReviewComment(
                 file_path="src/app.py",
@@ -350,6 +353,7 @@ class TestErrorPostsErrorComment:
 
         mock_reviewer = MagicMock()
         mock_reviewer_cls.return_value = mock_reviewer
+        mock_reviewer.rate_limit_failure_count = 0
         mock_reviewer.review_files.side_effect = RuntimeError("OpenAI API is down")
 
         env = {"OPENAI_API_KEY": "sk-test"}
@@ -487,6 +491,7 @@ class TestProjectContextPassedToReviewer:
 
         mock_reviewer = MagicMock()
         mock_reviewer_cls.return_value = mock_reviewer
+        mock_reviewer.rate_limit_failure_count = 0
         mock_reviewer.review_files.return_value = []
 
         env = {"OPENAI_API_KEY": "sk-test"}
@@ -527,6 +532,7 @@ class TestNoAgentsMdFallsBackToGeneric:
 
         mock_reviewer = MagicMock()
         mock_reviewer_cls.return_value = mock_reviewer
+        mock_reviewer.rate_limit_failure_count = 0
         mock_reviewer.review_files.return_value = []
 
         env = {"OPENAI_API_KEY": "sk-test"}
@@ -650,3 +656,90 @@ class TestCreatePlatformManualPrNumber:
 
         # PR_NUMBER path should be taken, not GITHUB_EVENT_PATH
         mock_build.assert_called_once_with("fake-token", "owner/repo", 42)
+
+
+class TestRateLimitTotalFailureExitsWithError:
+    """When all files fail due to rate limiting, post error and exit(1)."""
+
+    @patch("src.review.AIReviewer")
+    @patch("src.review.create_platform")
+    def test_all_files_rate_limited_posts_error_and_exits(
+        self, mock_create_platform, mock_reviewer_cls
+    ):
+        """All files rate limited -> error comment + sys.exit(1)."""
+        mock_platform = MagicMock()
+        mock_create_platform.return_value = mock_platform
+        mock_platform.is_fork.return_value = False
+        mock_platform.get_file_content.return_value = None
+        mock_platform.get_context.return_value = MagicMock(
+            title="Test", description="Test", head_sha="abc123"
+        )
+
+        mock_file = MagicMock()
+        mock_file.filename = "src/app.py"
+        mock_file.patch = SAMPLE_PATCH
+        mock_file.additions = 2
+        mock_file.deletions = 0
+        mock_platform.get_files.return_value = [mock_file]
+
+        mock_reviewer = MagicMock()
+        mock_reviewer_cls.return_value = mock_reviewer
+        mock_reviewer.review_files.return_value = []  # No comments due to failure
+        mock_reviewer.rate_limit_failure_count = 1  # All files failed
+
+        env = {"OPENAI_API_KEY": "sk-test"}
+        with patch.dict(os.environ, env, clear=False):
+            with pytest.raises(SystemExit) as exc_info:
+                main()
+            assert exc_info.value.code == 1
+
+        mock_platform.post_error_comment.assert_called_once()
+        error_msg = mock_platform.post_error_comment.call_args[0][0]
+        assert "rate limiting" in error_msg.lower()
+
+
+class TestPartialRateLimitAppendsSummaryWarning:
+    """When some files are rate limited, summary includes a warning."""
+
+    @patch("src.review.AIReviewer")
+    @patch("src.review.create_platform")
+    def test_partial_rate_limit_warns_in_summary(
+        self, mock_create_platform, mock_reviewer_cls
+    ):
+        """Partial rate limit -> summary includes rate limit warning."""
+        mock_platform = MagicMock()
+        mock_create_platform.return_value = mock_platform
+        mock_platform.is_fork.return_value = False
+        mock_platform.get_file_content.return_value = None
+        mock_platform.get_context.return_value = MagicMock(
+            title="Test", description="Test", head_sha="abc123"
+        )
+
+        mock_file = MagicMock()
+        mock_file.filename = "src/app.py"
+        mock_file.patch = SAMPLE_PATCH
+        mock_file.additions = 2
+        mock_file.deletions = 0
+        mock_platform.get_files.return_value = [mock_file]
+
+        mock_reviewer = MagicMock()
+        mock_reviewer_cls.return_value = mock_reviewer
+        mock_reviewer.review_files.return_value = [
+            ReviewComment(
+                file_path="src/app.py",
+                line_number=2,
+                severity="warning",
+                category="bug",
+                comment="Some issue",
+            )
+        ]
+        mock_reviewer.rate_limit_failure_count = 1  # One file failed
+
+        env = {"OPENAI_API_KEY": "sk-test"}
+        with patch.dict(os.environ, env, clear=False):
+            main()
+
+        mock_platform.post_review_comments.assert_called_once()
+        call_args = mock_platform.post_review_comments.call_args
+        summary = call_args[0][1]
+        assert "rate limiting" in summary.lower()

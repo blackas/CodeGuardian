@@ -55,9 +55,9 @@ def _build_event_data_from_pr(
     Returns:
         Synthetic event data dict compatible with GitHubClient.
     """
-    from github import Github
+    from github import Auth, Github
 
-    g = Github(token)
+    g = Github(auth=Auth.Token(token))
     repo = g.get_repo(repo_name)
     pr = repo.get_pull(pr_number)
     return {
@@ -258,6 +258,16 @@ def main() -> None:
             pr_description=context.description,
         )
 
+        # Check if all files failed due to rate limiting
+        if reviewer.rate_limit_failure_count > 0 and not ai_comments:
+            fail_msg = (
+                f"⚠️ CodeGuardian: All {len(review_files)} file(s) failed due to "
+                f"OpenAI API rate limiting after retries. No review was performed. "
+                f"Please re-run the workflow or check your API quota."
+            )
+            platform.post_error_comment(fail_msg)
+            sys.exit(1)
+
         # Build file_patches map for line validation
         file_patches = {f["filename"]: f["patch"] for f in reviewable}
 
@@ -276,6 +286,14 @@ def main() -> None:
 
         # Build summary and post
         summary = build_summary(valid_comments)
+
+        # Append rate limit warning to summary if some files failed
+        if reviewer.rate_limit_failure_count > 0:
+            summary += (
+                f" (⚠️ {reviewer.rate_limit_failure_count} file(s) skipped "
+                f"due to rate limiting)"
+            )
+
         platform.post_review_comments(platform_comments, summary)
 
     except Exception as error:
