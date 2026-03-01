@@ -6,7 +6,11 @@ from typing import Any
 
 HUNK_HEADER_PATTERN = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@")
 
-REVIEWABLE_EXTENSIONS = frozenset({".py", ".js", ".ts", ".html"})
+REVIEWABLE_EXTENSIONS = frozenset({
+    ".py", ".js", ".ts", ".tsx", ".jsx", ".html",
+    ".yml", ".yaml", ".css", ".scss",
+    ".go", ".rs", ".rb", ".java", ".kt", ".swift", ".sh",
+})
 
 
 @dataclass

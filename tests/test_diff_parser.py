@@ -108,7 +108,7 @@ class TestFilterReviewableFiles:
     def test_filter_reviewable_files_by_extension(
         self, sample_mixed_files: list[dict[str, Any]]
     ):
-        """Only .py, .js, .ts, .html files pass filter."""
+        """Reviewable extensions (.py, .js, .ts, .tsx, .yml, .css, .html) pass filter."""
         result = filter_reviewable_files(sample_mixed_files)
         filenames = [file["filename"] for file in result]
 
@@ -118,6 +118,9 @@ class TestFilterReviewableFiles:
         assert "template.html" in filenames
         assert "README.md" not in filenames
         assert "data.csv" not in filenames
+        assert "src/component.tsx" in filenames
+        assert "deploy.yml" in filenames
+        assert "styles.css" in filenames
 
     def test_filter_skips_binary_files(self, sample_mixed_files: list[dict[str, Any]]):
         """Binary files (patch=None) are filtered out."""

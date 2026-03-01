@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import re
+import random
 import time
 from typing import Literal
 
@@ -12,8 +13,11 @@ from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
-MAX_INPUT_LENGTH = 500
-MAX_RETRIES = 3
+MAX_TEXT_INPUT_LENGTH = 500
+MAX_PATCH_LENGTH = 100_000
+MAX_RETRIES = 5
+INITIAL_RETRY_DELAY = 10
+INTER_FILE_DELAY = 2
 MODEL_NAME = "gpt-4o-mini"
 TEMPERATURE = 0.2
 
@@ -56,6 +60,7 @@ class AIReviewer:
             self._client: OpenAI = OpenAI(api_key=api_key)
         else:
             self._client: OpenAI = None  # type: ignore[assignment]
+        self._rate_limit_failure_count = 0
 
     def review_diff(
         self,
@@ -108,7 +113,9 @@ class AIReviewer:
             AuthenticationError: If the API key is invalid.
         """
         all_comments: list[ReviewComment] = []
-        for file_info in files:
+        for idx, file_info in enumerate(files):
+            if idx > 0:
+                time.sleep(INTER_FILE_DELAY)
             response = self.review_diff(
                 file_path=file_info["file_path"],
                 patch=file_info["patch"],
@@ -164,14 +171,14 @@ class AIReviewer:
         """
         sanitized_title = self._sanitize_input(pr_title)
         sanitized_description = self._sanitize_input(pr_description)
-        sanitized_patch = self._sanitize_input(patch)
+        truncated_patch = patch[:MAX_PATCH_LENGTH] if len(patch) > MAX_PATCH_LENGTH else patch
 
         return (
             f"Review the following code diff:\n\n"
             f"File: {file_path}\n"
             f"PR Title: {sanitized_title}\n"
             f"PR Description: {sanitized_description}\n\n"
-            f"Diff:\n```\n{sanitized_patch}\n```\n\n"
+            f"Diff:\n```\n{truncated_patch}\n```\n\n"
             f"Provide your review as structured JSON."
         )
 
@@ -198,9 +205,9 @@ class AIReviewer:
         # Strip markdown code backticks
         sanitized = re.sub(r"`{1,3}", "", sanitized)
 
-        # Truncate to max length
-        if len(sanitized) > MAX_INPUT_LENGTH:
-            sanitized = sanitized[:MAX_INPUT_LENGTH]
+        # Truncate to max length (for title/description text, not patches)
+        if len(sanitized) > MAX_TEXT_INPUT_LENGTH:
+            sanitized = sanitized[:MAX_TEXT_INPUT_LENGTH]
 
         return sanitized
 
@@ -270,15 +277,28 @@ class AIReviewer:
             except RateLimitError as error:
                 last_exception = error
                 if attempt < MAX_RETRIES - 1:
-                    wait_time = 2 ** (attempt + 1)
+                    wait_time = INITIAL_RETRY_DELAY * (2 ** attempt)
+                    # Respect Retry-After header if available
+                    response_obj = getattr(error, "response", None)
+                    if response_obj and hasattr(response_obj, "headers"):
+                        retry_after = response_obj.headers.get("retry-after")
+                        if retry_after:
+                            try:
+                                wait_time = max(wait_time, float(retry_after))
+                            except (ValueError, TypeError):
+                                pass
+                    # Add jitter to prevent thundering herd
+                    jitter = random.uniform(0, wait_time * 0.25)
+                    actual_wait = wait_time + jitter
                     logger.info(
-                        "Rate limited. Retrying in %d seconds (attempt %d/%d)",
-                        wait_time,
+                        "Rate limited. Retrying in %.1f seconds (attempt %d/%d)",
+                        actual_wait,
                         attempt + 1,
                         MAX_RETRIES,
                     )
-                    time.sleep(wait_time)
+                    time.sleep(actual_wait)
 
+        self._rate_limit_failure_count += 1
         logger.error("Max retries exceeded for rate limit errors")
         return ReviewResponse(
             comments=[],
@@ -306,3 +326,8 @@ class AIReviewer:
             ],
             summary="Mock review completed.",
         )
+
+    @property
+    def rate_limit_failure_count(self) -> int:
+        """Count of files that failed all retries due to rate limiting."""
+        return self._rate_limit_failure_count

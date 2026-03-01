@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from github import Github, GithubException
+from github import Auth, Github, GithubException
 from github.GithubException import UnknownObjectException
 
 from src.platform_protocol import PlatformContext, PlatformFile
@@ -29,7 +29,7 @@ class GitHubClient:
             repo_name: Repository full name (owner/repo).
             event_data: GitHub webhook event payload.
         """
-        self._github = Github(token)
+        self._github = Github(auth=Auth.Token(token))
         self._repo = self._github.get_repo(repo_name)
         self._event_data = event_data
         self._pr_number: int = event_data["pull_request"]["number"]
@@ -89,6 +89,9 @@ class GitHubClient:
             summary: Summary comment text.
         """
         if not comments:
+            # Still post summary so the PR shows review was attempted
+            if summary:
+                self._pr.create_issue_comment(body=summary)
             return
 
         commits = self._pr.get_commits()
