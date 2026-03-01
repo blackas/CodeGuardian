@@ -556,6 +556,7 @@ class TestBuildEventDataFromPr:
         mock_pr.title = "Test PR"
         mock_pr.body = "Description"
         mock_pr.head.sha = "abc123"
+        mock_pr.head.ref = "feature-branch"
         mock_pr.head.repo.full_name = "owner/repo"
         mock_pr.base.ref = "main"
         mock_pr.base.repo.full_name = "owner/repo"
@@ -574,6 +575,7 @@ class TestBuildEventDataFromPr:
         assert result["pull_request"]["head"]["repo"]["full_name"] == "owner/repo"
         assert result["pull_request"]["base"]["ref"] == "main"
         assert result["pull_request"]["base"]["repo"]["full_name"] == "owner/repo"
+        assert result["pull_request"]["head"]["ref"] == "feature-branch"
 
 
 class TestCreatePlatformManualPrNumber:

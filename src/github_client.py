@@ -135,7 +135,11 @@ class GitHubClient:
         self._pr.create_issue_comment(body=error_message)
 
     def get_file_content(self, file_path: str) -> str | None:
-        """Get the content of a file from the base branch.
+        """Get the content of a file, trying PR head branch first.
+
+        Looks up the file on the PR head commit (SHA) first, so that files
+        added in the PR (e.g. AGENTS.md) are found even when they don't
+        exist on the base branch.  Falls back to the base branch ref.
 
         Args:
             file_path: Path to the file relative to repo root.
@@ -143,12 +147,21 @@ class GitHubClient:
         Returns:
             File content as string, or None if file not found.
         """
+        head_sha = self._event_data["pull_request"]["head"]["sha"]
         try:
-            base_ref = self._event_data["pull_request"]["base"]["ref"]
+            content_file = self._repo.get_contents(file_path, ref=head_sha)
+            return content_file.decoded_content.decode("utf-8")
+        except UnknownObjectException:
+            pass
+        except Exception:
+            logger.debug("Error reading %s at head SHA %s, trying base", file_path, head_sha)
+
+        base_ref = self._event_data["pull_request"]["base"]["ref"]
+        try:
             content_file = self._repo.get_contents(file_path, ref=base_ref)
             return content_file.decoded_content.decode("utf-8")
         except UnknownObjectException:
-            logger.warning("File not found: %s on branch %s", file_path, base_ref)
+            logger.warning("File not found: %s on head (%s) or base (%s)", file_path, head_sha, base_ref)
             return None
         except Exception:
             logger.warning("Error reading file: %s", file_path)

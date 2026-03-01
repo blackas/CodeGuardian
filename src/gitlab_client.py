@@ -141,7 +141,11 @@ class GitLabClient:
         )
 
     def get_file_content(self, file_path: str) -> str | None:
-        """Get the content of a file from the base branch.
+        """Get the content of a file, trying MR source branch first.
+
+        Looks up the file on the MR source branch first, so that files
+        added in the MR (e.g. AGENTS.md) are found even when they don't
+        exist on the target branch.  Falls back to the target branch.
 
         Args:
             file_path: Path to the file relative to repo root.
@@ -149,16 +153,33 @@ class GitLabClient:
         Returns:
             File content as string, or None if file not found.
         """
+        source_branch = self._merge_request.source_branch
         try:
             file_obj = self._project.files.get(
-                file_path=file_path, ref=self._merge_request.target_branch
+                file_path=file_path, ref=source_branch
+            )
+            return file_obj.decode().decode("utf-8")
+        except GitlabGetError:
+            pass
+        except Exception:
+            logger.debug(
+                "Error reading %s on source branch %s, trying target",
+                file_path,
+                source_branch,
+            )
+
+        target_branch = self._merge_request.target_branch
+        try:
+            file_obj = self._project.files.get(
+                file_path=file_path, ref=target_branch
             )
             return file_obj.decode().decode("utf-8")
         except GitlabGetError:
             logger.warning(
-                "File not found: %s on branch %s",
+                "File not found: %s on source (%s) or target (%s)",
                 file_path,
-                self._merge_request.target_branch,
+                source_branch,
+                target_branch,
             )
             return None
         except Exception:
