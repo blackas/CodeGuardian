@@ -268,9 +268,10 @@ class TestPostErrorComment:
 
 
 class TestGetFileContentSuccess:
-    """get_file_content returns decoded content when file exists."""
+    """get_file_content returns decoded content from head SHA first."""
 
-    def test_returns_decoded_content(self, mock_github):
+    def test_returns_decoded_content_from_head(self, mock_github):
+        """get_file_content tries head SHA first and returns content."""
         client, _, mock_repo = mock_github
 
         mock_content_file = MagicMock()
@@ -280,11 +281,29 @@ class TestGetFileContentSuccess:
         result = client.get_file_content("AGENTS.md")
 
         assert result == "# My Project"
-        mock_repo.get_contents.assert_called_once_with("AGENTS.md", ref="main")
+        mock_repo.get_contents.assert_called_once_with("AGENTS.md", ref="abc123def456")
+
+    def test_falls_back_to_base_when_head_404(self, mock_github):
+        """Falls back to base branch when file not found at head SHA."""
+        client, _, mock_repo = mock_github
+
+        mock_content_file = MagicMock()
+        mock_content_file.decoded_content = b"# Base Content"
+        mock_repo.get_contents.side_effect = [
+            UnknownObjectException(404, {"message": "Not Found"}, {}),
+            mock_content_file,
+        ]
+
+        result = client.get_file_content("AGENTS.md")
+
+        assert result == "# Base Content"
+        assert mock_repo.get_contents.call_count == 2
+        mock_repo.get_contents.assert_any_call("AGENTS.md", ref="abc123def456")
+        mock_repo.get_contents.assert_any_call("AGENTS.md", ref="main")
 
 
 class TestGetFileContentNotFound:
-    """get_file_content returns None on 404."""
+    """get_file_content returns None when file not found on both branches."""
 
     def test_returns_none_on_404(self, mock_github):
         client, _, mock_repo = mock_github
@@ -296,6 +315,7 @@ class TestGetFileContentNotFound:
         result = client.get_file_content("AGENTS.md")
 
         assert result is None
+        assert mock_repo.get_contents.call_count == 2
 
 
 class TestGetFileContentError:

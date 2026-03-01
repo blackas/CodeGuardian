@@ -25,7 +25,7 @@ def load_event_data(event_path: str) -> dict:
 
 
 def _fetch_project_context(platform: CodeReviewPlatform) -> str:
-    """Fetch AGENTS.md from repo base branch for project context.
+    """Fetch AGENTS.md from repo for project context.
 
     Args:
         platform: Platform client with get_file_content method.
@@ -68,6 +68,7 @@ def _build_event_data_from_pr(
             "body": pr.body or "",
             "head": {
                 "sha": pr.head.sha,
+                "ref": pr.head.ref,
                 "repo": {
                     "full_name": (pr.head.repo.full_name if pr.head.repo else repo_name)
                 },

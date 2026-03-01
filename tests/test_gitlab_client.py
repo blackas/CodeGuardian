@@ -18,6 +18,7 @@ def mock_mr():
     mr.description = "Resolves issue #99 with token refresh"
     mr.sha = "head_sha_abc123"
     mr.target_branch = "main"
+    mr.source_branch = "feature-branch"
     mr.diff_refs = {
         "base_sha": "base_sha_000",
         "start_sha": "start_sha_111",
@@ -236,9 +237,10 @@ class TestGitLabUrl:
 
 
 class TestGetFileContentSuccess:
-    """get_file_content returns decoded content when file exists."""
+    """get_file_content returns decoded content from source branch first."""
 
-    def test_returns_decoded_content(self, client, mock_project):
+    def test_returns_decoded_content_from_source(self, client, mock_project):
+        """get_file_content tries source branch first."""
         mock_file_obj = MagicMock()
         mock_file_obj.decode.return_value = b"# My Project"
         mock_project.files.get.return_value = mock_file_obj
@@ -247,12 +249,26 @@ class TestGetFileContentSuccess:
 
         assert result == "# My Project"
         mock_project.files.get.assert_called_once_with(
-            file_path="AGENTS.md", ref="main"
+            file_path="AGENTS.md", ref="feature-branch"
         )
+
+    def test_falls_back_to_target_when_source_404(self, client, mock_project):
+        """Falls back to target branch when file not found on source."""
+        mock_file_obj = MagicMock()
+        mock_file_obj.decode.return_value = b"# Target Content"
+        mock_project.files.get.side_effect = [
+            GitlabGetError("404 File Not Found"),
+            mock_file_obj,
+        ]
+
+        result = client.get_file_content("AGENTS.md")
+
+        assert result == "# Target Content"
+        assert mock_project.files.get.call_count == 2
 
 
 class TestGetFileContentNotFound:
-    """get_file_content returns None when file doesn't exist."""
+    """get_file_content returns None when file not found on both branches."""
 
     def test_returns_none_on_not_found(self, client, mock_project):
         mock_project.files.get.side_effect = GitlabGetError("404 File Not Found")
@@ -260,6 +276,7 @@ class TestGetFileContentNotFound:
         result = client.get_file_content("AGENTS.md")
 
         assert result is None
+        assert mock_project.files.get.call_count == 2
 
 
 class TestGetFileContentError:
