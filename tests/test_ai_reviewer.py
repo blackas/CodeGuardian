@@ -130,7 +130,7 @@ class TestSanitizeInputStripsMarkdown:
 
 
 class TestSanitizeInputTruncatesLongText:
-    """Test that _sanitize_input caps text at MAX_INPUT_LENGTH."""
+    """Test that _sanitize_input caps text at MAX_TEXT_INPUT_LENGTH."""
 
     def test_sanitize_input_truncates_long_text(self) -> None:
         """Input longer than 500 chars gets truncated to 500."""
@@ -177,10 +177,13 @@ class TestReviewFilesAggregatesComments:
             _make_openai_response(review_b),
         ]
 
-        with patch.object(
-            reviewer._client.chat.completions,
-            "create",
-            side_effect=responses,
+        with (
+            patch.object(
+                reviewer._client.chat.completions,
+                "create",
+                side_effect=responses,
+            ),
+            patch("src.ai_reviewer.time.sleep"),
         ):
             comments = reviewer.review_files(
                 files=[
@@ -225,7 +228,7 @@ class TestRateLimitRetries:
             )
 
         assert result.summary.startswith("Error: Rate limit exceeded")
-        assert mock_sleep.call_count == 2  # MAX_RETRIES - 1
+        assert mock_sleep.call_count == 4  # MAX_RETRIES - 1
 
 
 class TestAuthErrorRaises:
