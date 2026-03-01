@@ -58,7 +58,7 @@ def fork_event_data() -> dict:
 @pytest.fixture
 def mock_github(event_data: dict):
     """Patch PyGithub and return (client, mock_pr, mock_repo)."""
-    with patch("src.github_client.Github") as MockGithub:
+    with patch("src.github_client.Github") as MockGithub, patch("src.github_client.Auth") as MockAuth:
         mock_repo = MagicMock()
         mock_pr = MagicMock()
         mock_repo.get_pull.return_value = mock_pr
@@ -242,6 +242,16 @@ class TestPostReviewComments:
         call_kwargs = mock_pr.create_review.call_args.kwargs
         assert call_kwargs["event"] == "COMMENT"
 
+    def test_post_review_comments_empty_still_posts_summary(self, mock_github):
+        """When comments list is empty, summary is still posted as issue comment."""
+        client, mock_pr, _ = mock_github
+
+        client.post_review_comments([], "CodeGuardian Review: Found 0 issues")
+
+        mock_pr.create_issue_comment.assert_called_once_with(
+            body="CodeGuardian Review: Found 0 issues"
+        )
+        mock_pr.create_review.assert_not_called()
 
 class TestPostErrorComment:
     """Tests for GitHubClient.post_error_comment."""
