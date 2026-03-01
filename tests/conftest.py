@@ -71,6 +71,24 @@ def sample_mixed_files() -> list[dict[str, Any]]:
             "deletions": 0,
         },
         {
+            "filename": "src/component.tsx",
+            "patch": "@@ -1,2 +1,3 @@\n ctx\n+new",
+            "additions": 1,
+            "deletions": 0,
+        },
+        {
+            "filename": "deploy.yml",
+            "patch": "@@ -1,2 +1,3 @@\n ctx\n+new",
+            "additions": 1,
+            "deletions": 0,
+        },
+        {
+            "filename": "styles.css",
+            "patch": "@@ -1,2 +1,3 @@\n ctx\n+new",
+            "additions": 1,
+            "deletions": 0,
+        },
+        {
             "filename": "README.md",
             "patch": "@@ -1,2 +1,3 @@\n ctx\n+new",
             "additions": 1,
