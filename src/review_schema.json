@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "comments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "file_path": { "type": "string" },
+          "line_number": { "type": "integer" },
+          "severity": { "type": "string", "enum": ["error", "warning", "info"] },
+          "category": { "type": "string", "enum": ["bug", "security", "performance", "readability"] },
+          "comment": { "type": "string" }
+        },
+        "required": ["file_path", "line_number", "severity", "category", "comment"],
+        "additionalProperties": false
+      }
+    },
+    "summary": { "type": "string" }
+  },
+  "required": ["comments", "summary"],
+  "additionalProperties": false
+}
