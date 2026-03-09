@@ -50,9 +50,13 @@ src/
 ├── platform_protocol.py   # CodeReviewPlatform Protocol + shared types
 ├── diff_parser.py          # Unified diff parsing and line mapping
 ├── ai_reviewer.py          # OpenAI GPT-4o-mini structured output
+├── codex_reviewer.py       # Codex CLI reviewer (ChatGPT Plus OAuth)
 ├── github_client.py        # GitHub API (PyGithub)
 ├── gitlab_client.py        # GitLab API (python-gitlab)
-└── review.py               # Main orchestrator + auto-detection
+├── review.py               # Main orchestrator + auto-detection
+├── webhook_server.py       # Self-hosted webhook server (FastAPI)
+├── server.py               # Webhook server entry point
+└── review_schema.json      # Codex structured output schema
 ```
 
 ## Setup
@@ -200,6 +204,59 @@ codeguardian-review:
 
 **5. Open a Merge Request — CodeGuardian will automatically review it.**
 
+## Self-Hosted Mode (Codex OAuth)
+
+Run CodeGuardian on your own machine using Codex CLI with ChatGPT Plus -- no OpenAI API key required.
+
+### Prerequisites
+
+- [Codex CLI](https://developers.openai.com/codex/cli/) installed and logged in (`codex login`)
+- ChatGPT Plus/Pro subscription
+- [ngrok](https://ngrok.com/) or Cloudflare Tunnel for HTTPS
+
+### Setup
+
+1. Clone and install:
+   ```bash
+   git clone https://github.com/your-org/CodeGuardian.git
+   cd CodeGuardian
+   uv sync
+   ```
+
+2. Log in to Codex CLI:
+   ```bash
+   codex login
+   ```
+
+3. Set environment variables:
+   ```bash
+   export GITHUB_TOKEN="ghp_your_token"
+   export WEBHOOK_SECRET="your_webhook_secret"
+   ```
+
+4. Start the server:
+   ```bash
+   uv run python -m src.server
+   ```
+
+5. Expose via tunnel:
+   ```bash
+   ngrok http 8000
+   ```
+
+6. Register webhook in GitHub repo Settings > Webhooks:
+   - URL: `https://your-ngrok-url/webhook`
+   - Content type: `application/json`
+   - Secret: same as `WEBHOOK_SECRET`
+   - Events: Pull requests
+
+### Environment Variables (Self-Hosted)
+
+| Variable | Description |
+|----------|-------------|
+| `GITHUB_TOKEN` | GitHub Personal Access Token with `repo` scope |
+| `WEBHOOK_SECRET` | Secret for GitHub webhook signature verification |
+
 ## Local Development
 
 ### Install dependencies
@@ -309,6 +366,8 @@ Managed via [uv](https://docs.astral.sh/uv/) with `pyproject.toml`.
 | python-gitlab | >=4.13.0 | GitLab API client |
 | openai | >=1.58.0 | OpenAI GPT-4o-mini |
 | pydantic | >=2.10.0 | Structured output models |
+| fastapi | >=0.115.0 | Webhook server (self-hosted mode) |
+| uvicorn | >=0.34.0 | ASGI server (self-hosted mode) |
 
 Dev dependencies: `pytest`, `pytest-mock`
 
