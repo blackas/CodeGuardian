@@ -3,6 +3,7 @@
 import json
 import logging
 import subprocess
+import tempfile
 from pathlib import Path
 
 from src.ai_reviewer import ReviewComment, ReviewResponse
@@ -79,15 +80,20 @@ class CodexReviewer:
 
     def _call_codex(self, prompt: str) -> ReviewResponse:
         try:
+            with tempfile.NamedTemporaryFile(
+                mode="w", suffix=".json", delete=False
+            ) as tmp:
+                output_path = tmp.name
+
             result = subprocess.run(
                 [
                     "codex", "exec", prompt,
                     "--output-schema", str(SCHEMA_PATH),
-                    "-o", "/dev/stdout",
+                    "-o", output_path,
                 ],
                 capture_output=True,
                 text=True,
-                timeout=120,
+                timeout=300,
             )
 
             if result.returncode != 0:
@@ -97,17 +103,23 @@ class CodexReviewer:
                     summary=f"Error: Codex exec failed: {result.stderr[:200]}",
                 )
 
-            parsed = json.loads(result.stdout)
+            output_file = Path(output_path)
+            raw = output_file.read_text()
+            output_file.unlink(missing_ok=True)
+
+            parsed = json.loads(raw)
             return ReviewResponse.model_validate(parsed)
 
         except subprocess.TimeoutExpired:
             logger.error("Codex exec timed out")
+            Path(output_path).unlink(missing_ok=True)
             return ReviewResponse(
                 comments=[],
-                summary="Error: Codex exec timed out after 120 seconds.",
+                summary="Error: Codex exec timed out after 300 seconds.",
             )
         except (json.JSONDecodeError, Exception) as e:
             logger.error("Failed to parse Codex output: %s", e)
+            Path(output_path).unlink(missing_ok=True)
             return ReviewResponse(
                 comments=[],
                 summary=f"Error: Failed to parse Codex output: {e}",

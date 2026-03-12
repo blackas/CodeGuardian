@@ -1,7 +1,8 @@
 """Tests for Codex CLI-based code reviewer."""
 
 import json
-from unittest.mock import MagicMock, patch
+import subprocess
+from unittest.mock import MagicMock, patch, mock_open
 
 import pytest
 
@@ -34,8 +35,11 @@ class TestCodexReviewerBuildPrompt:
 
 
 class TestCodexReviewerCallCodex:
+    @patch("src.codex_reviewer.Path.unlink")
+    @patch("src.codex_reviewer.Path.read_text")
     @patch("src.codex_reviewer.subprocess.run")
-    def test_calls_codex_exec_and_parses_output(self, mock_run):
+    @patch("src.codex_reviewer.tempfile.NamedTemporaryFile")
+    def test_calls_codex_exec_and_parses_output(self, mock_tmp, mock_run, mock_read, mock_unlink):
         review_data = {
             "comments": [
                 {
@@ -48,11 +52,10 @@ class TestCodexReviewerCallCodex:
             ],
             "summary": "Found 1 issue.",
         }
-        mock_run.return_value = MagicMock(
-            returncode=0,
-            stdout=json.dumps(review_data),
-            stderr="",
-        )
+        mock_tmp.return_value.__enter__ = lambda s: MagicMock(name="/tmp/test.json")
+        mock_tmp.return_value.__exit__ = lambda s, *a: None
+        mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
+        mock_read.return_value = json.dumps(review_data)
 
         reviewer = CodexReviewer()
         result = reviewer.review_diff(
@@ -71,7 +74,10 @@ class TestCodexReviewerCallCodex:
         assert "exec" in cmd
 
     @patch("src.codex_reviewer.subprocess.run")
-    def test_returns_empty_on_codex_failure(self, mock_run):
+    @patch("src.codex_reviewer.tempfile.NamedTemporaryFile")
+    def test_returns_empty_on_codex_failure(self, mock_tmp, mock_run):
+        mock_tmp.return_value.__enter__ = lambda s: MagicMock(name="/tmp/test.json")
+        mock_tmp.return_value.__exit__ = lambda s, *a: None
         mock_run.return_value = MagicMock(
             returncode=1,
             stdout="",
@@ -91,9 +97,11 @@ class TestCodexReviewerCallCodex:
         assert "Error" in result.summary
 
     @patch("src.codex_reviewer.subprocess.run")
-    def test_handles_timeout(self, mock_run):
-        import subprocess
-        mock_run.side_effect = subprocess.TimeoutExpired(cmd="codex", timeout=120)
+    @patch("src.codex_reviewer.tempfile.NamedTemporaryFile")
+    def test_handles_timeout(self, mock_tmp, mock_run):
+        mock_tmp.return_value.__enter__ = lambda s: MagicMock(name="/tmp/test.json")
+        mock_tmp.return_value.__exit__ = lambda s, *a: None
+        mock_run.side_effect = subprocess.TimeoutExpired(cmd="codex", timeout=300)
 
         reviewer = CodexReviewer()
         result = reviewer.review_diff(
@@ -109,8 +117,11 @@ class TestCodexReviewerCallCodex:
 
 
 class TestCodexReviewerReviewFiles:
+    @patch("src.codex_reviewer.Path.unlink")
+    @patch("src.codex_reviewer.Path.read_text")
     @patch("src.codex_reviewer.subprocess.run")
-    def test_aggregates_comments_from_multiple_files(self, mock_run):
+    @patch("src.codex_reviewer.tempfile.NamedTemporaryFile")
+    def test_aggregates_comments_from_multiple_files(self, mock_tmp, mock_run, mock_read, mock_unlink):
         review_a = json.dumps({
             "comments": [{"file_path": "a.py", "line_number": 1, "severity": "error", "category": "bug", "comment": "Issue"}],
             "summary": "Review a",
@@ -119,10 +130,13 @@ class TestCodexReviewerReviewFiles:
             "comments": [{"file_path": "b.py", "line_number": 5, "severity": "info", "category": "readability", "comment": "Note"}],
             "summary": "Review b",
         })
+        mock_tmp.return_value.__enter__ = lambda s: MagicMock(name="/tmp/test.json")
+        mock_tmp.return_value.__exit__ = lambda s, *a: None
         mock_run.side_effect = [
-            MagicMock(returncode=0, stdout=review_a, stderr=""),
-            MagicMock(returncode=0, stdout=review_b, stderr=""),
+            MagicMock(returncode=0, stdout="", stderr=""),
+            MagicMock(returncode=0, stdout="", stderr=""),
         ]
+        mock_read.side_effect = [review_a, review_b]
 
         reviewer = CodexReviewer()
         comments = reviewer.review_files(
