@@ -246,10 +246,10 @@ class TestPostReviewComments:
         """When comments list is empty, summary is still posted as issue comment."""
         client, mock_pr, _ = mock_github
 
-        client.post_review_comments([], "CodeGuardian Review: Found 0 issues")
+        client.post_review_comments([], "CodeGuardian Review: 0 comments (no comments)")
 
         mock_pr.create_issue_comment.assert_called_once_with(
-            body="CodeGuardian Review: Found 0 issues"
+            body="CodeGuardian Review: 0 comments (no comments)"
         )
         mock_pr.create_review.assert_not_called()
 

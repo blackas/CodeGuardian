@@ -190,16 +190,30 @@ def build_summary(comments: list[ReviewComment]) -> str:
         comments: List of ReviewComment to summarize.
 
     Returns:
-        Summary string like "CodeGuardian Review: Found 3 issues (2 errors, 1 warning, 0 info)"
+        Summary string with detailed breakdown of review findings.
     """
     error_count = sum(1 for c in comments if c.severity == "error")
     warning_count = sum(1 for c in comments if c.severity == "warning")
     info_count = sum(1 for c in comments if c.severity == "info")
+    praise_count = sum(1 for c in comments if c.severity == "praise")
+    issue_count = error_count + warning_count + info_count
     total = len(comments)
 
+    parts = []
+    if error_count:
+        parts.append(f"{error_count} errors")
+    if warning_count:
+        parts.append(f"{warning_count} warnings")
+    if info_count:
+        parts.append(f"{info_count} info")
+    if praise_count:
+        parts.append(f"{praise_count} praise")
+
+    breakdown = ", ".join(parts) if parts else "no comments"
+
     return (
-        f"CodeGuardian Review: Found {total} issues "
-        f"({error_count} errors, {warning_count} warnings, {info_count} info)"
+        f"CodeGuardian Review: {total} comments "
+        f"({breakdown})"
     )
 
 

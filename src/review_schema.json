@@ -9,8 +9,8 @@
         "properties": {
           "file_path": { "type": "string" },
           "line_number": { "type": "integer" },
-          "severity": { "type": "string", "enum": ["error", "warning", "info"] },
-          "category": { "type": "string", "enum": ["bug", "security", "performance", "readability"] },
+          "severity": { "type": "string", "enum": ["error", "warning", "info", "praise"] },
+          "category": { "type": "string", "enum": ["bug", "security", "performance", "readability", "logic-error", "improvement", "praise"] },
           "comment": { "type": "string" }
         },
         "required": ["file_path", "line_number", "severity", "category", "comment"],

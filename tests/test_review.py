@@ -450,15 +450,38 @@ class TestBuildSummary:
             ),
         ]
         result = build_summary(comments)
-        assert "3 issues" in result
+        assert "3 comments" in result
         assert "2 errors" in result
         assert "1 warning" in result
         assert "CodeGuardian" in result
 
     def test_empty_comments(self):
-        """Empty comments list produces summary with 0 issues."""
+        """Empty comments list produces summary with no comments."""
         result = build_summary([])
-        assert "0 issues" in result
+        assert "0 comments" in result
+
+    def test_counts_praise(self):
+        """Summary includes praise count."""
+        comments = [
+            ReviewComment(
+                file_path="a.py",
+                line_number=1,
+                severity="praise",
+                category="praise",
+                comment="Great pattern!",
+            ),
+            ReviewComment(
+                file_path="a.py",
+                line_number=5,
+                severity="warning",
+                category="improvement",
+                comment="Could be better",
+            ),
+        ]
+        result = build_summary(comments)
+        assert "2 comments" in result
+        assert "1 praise" in result
+        assert "1 warning" in result
 
 
 class TestProjectContextPassedToReviewer:

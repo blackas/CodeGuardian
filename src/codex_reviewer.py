@@ -66,7 +66,10 @@ class CodexReviewer:
         return (
             f"You are a senior code reviewer. Review the following code diff and return structured JSON feedback.\n\n"
             f"{context_section}"
-            f"Focus on: logic errors, security vulnerabilities, performance issues, readability.\n\n"
+            f"Provide a thorough, detailed review. For EVERY changed section, leave at least one comment.\n"
+            f"Include both positive feedback and issues.\n\n"
+            f"Severity levels: error (must fix), warning (should fix), info (minor), praise (good code).\n"
+            f"Categories: praise, bug, logic-error, security, performance, improvement, readability.\n\n"
             f"File: {file_path}\n"
             f"PR Title: {pr_title}\n"
             f"PR Description: {pr_description}\n\n"

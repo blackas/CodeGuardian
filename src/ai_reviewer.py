@@ -27,8 +27,8 @@ class ReviewComment(BaseModel):
 
     file_path: str
     line_number: int
-    severity: Literal["error", "warning", "info"]
-    category: Literal["bug", "security", "performance", "readability"]
+    severity: Literal["error", "warning", "info", "praise"]
+    category: Literal["bug", "security", "performance", "readability", "logic-error", "improvement", "praise"]
     comment: str
 
 
@@ -131,24 +131,36 @@ class AIReviewer:
         Returns:
             System prompt string, either context-aware or generic.
         """
+        review_instructions = (
+            "Provide a thorough, detailed review. For EVERY changed section, leave at least one comment. "
+            "Include both positive feedback and issues.\n\n"
+            "Severity levels:\n"
+            "- error: Must fix before merging (bugs, security holes, logic errors)\n"
+            "- warning: Should fix (performance issues, improvements needed)\n"
+            "- info: Minor suggestions (readability, style)\n"
+            "- praise: Good patterns, well-written code, clever solutions\n\n"
+            "Categories:\n"
+            "- praise: Well-written code, good patterns, good decisions\n"
+            "- bug: Incorrect behavior, edge cases, null/undefined issues\n"
+            "- logic-error: Flawed logic, wrong conditions, off-by-one errors\n"
+            "- security: Vulnerabilities, injection, auth issues\n"
+            "- performance: Inefficient code, N+1 queries, memory issues\n"
+            "- improvement: Better approaches, refactoring suggestions\n"
+            "- readability: Naming, structure, documentation\n\n"
+            "For each comment, provide the file path, line number, severity, category, "
+            "and a clear explanation. For issues, include a suggested fix."
+        )
+
         if self._project_context:
             return (
                 "You are a senior code reviewer. The following describes the project you are reviewing:\n\n"
                 f"{self._project_context}\n\n"
-                "Based on this project context, review the provided code diff and return structured JSON feedback. "
-                "For each issue found, provide the file path, line number, severity (error/warning/info), "
-                "category (bug/security/performance/readability), and a clear explanation of the issue and suggested fix."
+                f"{review_instructions}"
             )
         else:
             return (
                 "You are a senior code reviewer. Review the provided code diff and return structured JSON feedback.\n\n"
-                "Focus on:\n"
-                "1. Logic errors and potential bugs\n"
-                "2. Security vulnerabilities\n"
-                "3. Performance issues\n"
-                "4. Code readability and maintainability\n\n"
-                "For each issue found, provide the file path, line number, severity (error/warning/info), "
-                "category (bug/security/performance/readability), and a clear explanation of the issue and suggested fix."
+                f"{review_instructions}"
             )
 
     def _build_user_prompt(
