@@ -75,6 +75,7 @@ class CodexReviewer:
             f"PR Title: {pr_title}\n"
             f"PR Description: {pr_description}\n\n"
             f"Diff:\n```\n{patch}\n```\n\n"
+            f"IMPORTANT: Write all comment text in Korean (한국어).\n\n"
             f"Return JSON with 'comments' array and 'summary' string."
         )
 

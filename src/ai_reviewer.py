@@ -148,7 +148,8 @@ class AIReviewer:
             "- improvement: Better approaches, refactoring suggestions\n"
             "- readability: Naming, structure, documentation\n\n"
             "For each comment, provide the file path, line number, severity, category, "
-            "and a clear explanation. For issues, include a suggested fix."
+            "and a clear explanation. For issues, include a suggested fix.\n\n"
+            "IMPORTANT: Write all comment text in Korean (한국어)."
         )
 
         if self._project_context:
